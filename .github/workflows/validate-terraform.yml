@@ -70,9 +70,9 @@ jobs:
       # Step 5: Format Check
       # Verify Terraform files follow standard formatting conventions
       # Fails if formatting is incorrect
-    #   - name: Terraform Format Check
-    #     run: terraform fmt -check -diff
-    #     continue-on-error: false  # Fail workflow if formatting check fails
+      - name: Terraform Format Check
+        run: terraform fmt -check -diff
+        #continue-on-error: false  # Fail workflow if formatting check fails
 
       # Step 6: Validate Configuration
       # Check Terraform syntax and configuration validity
