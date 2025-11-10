@@ -1,0 +1,89 @@
+# GitHub Actions Workflow for EKS Terraform Plan
+# This workflow validates and plans Terraform infrastructure changes for EKS
+name: 'EKS-Terraform-Plan'
+
+# Trigger Configuration
+# Runs on every push to any branch for continuous validation
+on:
+  push:
+    branches: 
+      - '**'  # Wildcard matches all branches
+
+
+# Environment Variables
+# AWS credentials and region configuration from GitHub Secrets
+env: 
+  AWS_REGION: us-east-1  # Default AWS region for deployment
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # AWS access key from repository secrets
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # AWS secret key from repository secrets
+
+# Permissions
+# Minimal permissions required for the workflow
+permissions:
+  contents: read  # Read-only access to repository contents
+
+# Job Definition
+jobs:
+  terraform:
+    name: Terraform Plan  # Display name in GitHub Actions UI
+    runs-on: ubuntu-latest  # Use latest Ubuntu runner
+    environment: production  # Use production environment settings
+
+    # Default Settings
+    # Configure shell and working directory for all steps
+    defaults:
+      run:
+        shell: bash  # Use bash shell for commands
+        working-directory: eks  # Run all commands in the eks directory
+
+    steps:
+      # Step 1: Checkout Repository
+      # Clone the repository code to the runner
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # Step 2: Setup Terraform
+      # Install specific version of Terraform CLI
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with: 
+          terraform_version: 1.9.3  # Pin Terraform version for consistency
+          terraform_wrapper: true  # Enable Terraform wrapper for enhanced output
+
+      # Step 3: Cache Terraform Dependencies
+      # Cache Terraform plugins and modules to speed up subsequent runs
+      - name: Cache Terraform
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache  # Terraform plugin cache directory
+            .terraform  # Local Terraform directory
+          key: ${{ runner.os }}-terraform-${{ hashFiles('**/*.tf') }}  # Cache key based on OS and Terraform files
+          restore-keys: |
+            ${{ runner.os }}-terraform-  # Fallback cache key
+
+      # Step 4: Initialize Terraform
+      # Download providers and modules, configure backend
+      - name: Terraform Init
+        run: terraform init
+
+      # Step 5: Format Check
+      # Verify Terraform files follow standard formatting conventions
+      # Fails if formatting is incorrect
+      - name: Terraform Format Check
+        run: terraform fmt -check -diff
+        continue-on-error: false  # Fail workflow if formatting check fails
+
+      # Step 6: Validate Configuration
+      # Check Terraform syntax and configuration validity
+      - name: Terraform Validate
+        run: terraform validate
+        continue-on-error: false  # Fail workflow if validation fails
+
+      # Step 7: Generate Execution Plan
+      # Create a plan showing what changes Terraform will make
+      # Uses dev.tfvars for environment-specific configuration
+      - name: Terraform plan
+        run: |
+          terraform plan -var-file=dev.tfvars -input=false
+        continue-on-error: false  # Fail workflow if plan generation fails
